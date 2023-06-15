@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.6.33723.286
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VegasTimer", "VegasTimer\VegasTimer.csproj", "{204ED994-C4B6-48A5-903D-F679E016F6DB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{204ED994-C4B6-48A5-903D-F679E016F6DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{204ED994-C4B6-48A5-903D-F679E016F6DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{204ED994-C4B6-48A5-903D-F679E016F6DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{204ED994-C4B6-48A5-903D-F679E016F6DB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BB0D8696-91AC-47FE-8068-008E869AB211}
+	EndGlobalSection
+EndGlobal
