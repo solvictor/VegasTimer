@@ -4,6 +4,8 @@ using System.Collections;
 using System.Windows.Forms;
 using ScriptPortal.Vegas;
 using System.ComponentModel;
+using System.IO;
+using Newtonsoft.Json;
 
 namespace VegasTimer
 {
@@ -15,14 +17,14 @@ namespace VegasTimer
         private readonly Button Start;
         private readonly Button Reset;
         private readonly Timer Timer;
-        private readonly VegasTimer VegasTimer;
+        private readonly Config Config;
 
-        public Chronometer(VegasTimer vegasTimer) : base("Timer")
+        public Chronometer(ref Config config) : base("Timer")
         {
             DefaultDockWindowStyle = DockWindowStyle.Floating;
             Dock = DockStyle.Fill;
             Text = "Timer";
-            VegasTimer = vegasTimer;
+            Config = config;
             BackColor = Color.FromArgb(34, 34, 34);
             Closing += OnClose;
             DefaultFloatingSize = new Size(200, 120);
@@ -53,7 +55,7 @@ namespace VegasTimer
 
             Time = new Label
             {
-                Text = VegasTimer.Elapsed.ToString(@"hh\:mm\:ss\:fff"),
+                Text = Config.Elapsed.ToString(@"hh\:mm\:ss\:fff"),
                 Location = new Point(10, 10),
                 Font = new Font("Arial", 20),
                 AutoSize = true,
@@ -76,7 +78,7 @@ namespace VegasTimer
             if (IsRunning)
             {
                 Timer.Stop();
-                VegasTimer.Elapsed += DateTime.Now - StartTime;
+                Config.Elapsed += DateTime.Now - StartTime;
                 Start.Text = "Start";
             }
             else
@@ -84,6 +86,7 @@ namespace VegasTimer
                 Timer.Start();
                 StartTime = DateTime.Now;
                 Start.Text = "Pause";
+                Config.Save();
             }
             IsRunning = !IsRunning;
         }
@@ -91,22 +94,95 @@ namespace VegasTimer
         private void ClickReset(object sender, EventArgs e)
         {
             Timer.Stop();
-            VegasTimer.Elapsed = TimeSpan.Zero;
+            Config.Elapsed = TimeSpan.Zero;
             IsRunning = false;
             Time.Text = "00:00:00:000";
+            Config.Save();
         }
 
         private void OnTick(object sender, EventArgs e)
         {
-            TimeSpan currentTime = DateTime.Now - StartTime + VegasTimer.Elapsed;
+            TimeSpan currentTime = DateTime.Now - StartTime + Config.Elapsed;
             Time.Text = currentTime.ToString(@"hh\:mm\:ss\:fff");
+        }
+    }
+
+    public class Config
+    {
+        public TimeSpan Elapsed { get; set; } = TimeSpan.Zero;
+
+        [JsonIgnore]
+        public const string Title = "VegasTimer";
+        [JsonIgnore]
+        public static string Directory = Environment.CurrentDirectory + "\\VegasTimer";
+        [JsonIgnore]
+        public static string Path = Directory + "\\config.json";
+
+        public void Load()
+        {
+            FileInfo configFile = new FileInfo(Path);
+
+            if (configFile.Exists)
+            {
+                try
+                {
+                    string content = File.ReadAllText(Path);
+                    Config serealized = JsonConvert.DeserializeObject<Config>(content);
+                    this.Elapsed = serealized.Elapsed;
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show("Error: Failed to read config, try deleting it and restarting vegas pro.\n" + e.Message, Title);
+                }
+                return;
+            }
+
+            try
+            {
+                if (!configFile.Directory.Exists)
+                    System.IO.Directory.CreateDirectory(Directory);
+                File.Create(Path).Close();
+                Save();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Error: Cannot create config file.\n" + e.Message, Title);
+            }
+        }
+
+        public bool IsValid()
+        {
+            return true;
+        }
+
+        public void Save()
+        {
+            JsonSerializerSettings settings = new JsonSerializerSettings()
+            {
+                Formatting = Formatting.Indented
+            };
+            JsonSerializer serializer = JsonSerializer.Create(settings);
+            serializer.NullValueHandling = NullValueHandling.Ignore;
+
+            try
+            {
+                StreamWriter sw = new StreamWriter(Path);
+                JsonWriter writer = new JsonTextWriter(sw);
+                serializer.Serialize(writer, this);
+                writer.Close();
+                sw.Close();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Error: Failed to save configuration.\n" + e.Message, Title);
+            }
         }
     }
 
     public class VegasTimer : ICustomCommandModule
     {
         public Vegas Vegas = null;
-        public TimeSpan Elapsed = TimeSpan.Zero;
+        private Config Config = new Config();
 
         public ICollection GetCustomCommands()
         {
@@ -120,7 +196,7 @@ namespace VegasTimer
             {
                 if (!Vegas.ActivateDockView("TimerView"))
                 {
-                    Chronometer chrono = new Chronometer(this)
+                    Chronometer chrono = new Chronometer(ref Config)
                     {
                         AutoLoadCommand = timer
                     };
@@ -135,6 +211,10 @@ namespace VegasTimer
         public void InitializeModule(Vegas vegas)
         {
             Vegas = vegas;
+
+            vegas.AppInitialized += (v, args) => Config.Load();
+
+            vegas.AppDeactivate += (v, args) => Config.Save();
         }
     }
 }
