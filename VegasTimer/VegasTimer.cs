@@ -22,10 +22,12 @@ namespace VegasTimer
         public Chronometer(ref Config config) : base("Timer")
         {
             DefaultDockWindowStyle = DockWindowStyle.Floating;
-            Dock = DockStyle.Fill;
+            PersistDockWindowState = true;
             Text = "Timer";
             Config = config;
             BackColor = Color.FromArgb(34, 34, 34);
+            Loaded += OnLoaded;
+            AppWindowClosing += OnClose;
             Closing += OnClose;
             DefaultFloatingSize = new Size(200, 120);
 
@@ -64,13 +66,17 @@ namespace VegasTimer
             Controls.Add(Time);
         }
 
+        private void OnLoaded(object sender, EventArgs e)
+        {
+            if (!Config.IsLoaded)
+                Config.Load();
+            Time.Text = Config.Elapsed.ToString(@"hh\:mm\:ss\:fff");
+        }
+
         private void OnClose(object sender, CancelEventArgs e)
         {
             if (IsRunning)
-            {
                 ClickStart(this, EventArgs.Empty);
-                Timer.Stop();
-            }
         }
 
         private void ClickStart(object sender, EventArgs e)
@@ -86,8 +92,8 @@ namespace VegasTimer
                 Timer.Start();
                 StartTime = DateTime.Now;
                 Start.Text = "Pause";
-                Config.Save();
             }
+            Config.Save();
             IsRunning = !IsRunning;
         }
 
@@ -110,7 +116,7 @@ namespace VegasTimer
     public class Config
     {
         public TimeSpan Elapsed { get; set; } = TimeSpan.Zero;
-
+        public bool IsLoaded { get; set; } = false;
         [JsonIgnore]
         public const string Title = "VegasTimer";
         [JsonIgnore]
@@ -121,7 +127,7 @@ namespace VegasTimer
         public void Load()
         {
             FileInfo configFile = new FileInfo(Path);
-
+            
             if (configFile.Exists)
             {
                 try
@@ -129,6 +135,7 @@ namespace VegasTimer
                     string content = File.ReadAllText(Path);
                     Config serealized = JsonConvert.DeserializeObject<Config>(content);
                     this.Elapsed = serealized.Elapsed;
+                    this.IsLoaded = true;
                 }
                 catch (Exception e)
                 {
@@ -143,6 +150,7 @@ namespace VegasTimer
                     System.IO.Directory.CreateDirectory(Directory);
                 File.Create(Path).Close();
                 Save();
+                this.IsLoaded = true;
             }
             catch (Exception e)
             {
@@ -212,7 +220,10 @@ namespace VegasTimer
         {
             Vegas = vegas;
 
-            vegas.AppInitialized += (v, args) => Config.Load();
+            vegas.AppInitialized += (v, args) => { 
+                if (!Config.IsLoaded)
+                    Config.Load();
+            };
 
             vegas.AppDeactivate += (v, args) => Config.Save();
         }
