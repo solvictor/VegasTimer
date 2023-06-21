@@ -116,6 +116,7 @@ namespace VegasTimer
     public class Config
     {
         public TimeSpan Elapsed { get; set; } = TimeSpan.Zero;
+        [JsonIgnore]
         public bool IsLoaded { get; set; } = false;
         [JsonIgnore]
         public const string Title = "VegasTimer";
@@ -134,8 +135,8 @@ namespace VegasTimer
                 {
                     string content = File.ReadAllText(Path);
                     Config serealized = JsonConvert.DeserializeObject<Config>(content);
-                    this.Elapsed = serealized.Elapsed;
-                    this.IsLoaded = true;
+                    Elapsed = serealized.Elapsed;
+                    IsLoaded = true;
                 }
                 catch (Exception e)
                 {
@@ -150,7 +151,7 @@ namespace VegasTimer
                     System.IO.Directory.CreateDirectory(Directory);
                 File.Create(Path).Close();
                 Save();
-                this.IsLoaded = true;
+                IsLoaded = true;
             }
             catch (Exception e)
             {
