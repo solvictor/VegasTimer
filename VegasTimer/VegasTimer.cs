@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Media;
 using System.Drawing;
 using System.Collections;
 using System.Windows.Forms;
@@ -16,6 +17,7 @@ namespace VegasTimer
         private readonly Label Time;
         private readonly Button Start;
         private readonly Button Reset;
+        private readonly CheckBox Sounds;
         private readonly Timer Timer;
         private readonly Config Config;
 
@@ -29,7 +31,7 @@ namespace VegasTimer
             Loaded += OnLoaded;
             AppWindowClosing += OnClose;
             Closing += OnClose;
-            DefaultFloatingSize = new Size(200, 120);
+            DefaultFloatingSize = new Size(200, 175);
 
             Timer = new Timer()
             {
@@ -55,6 +57,16 @@ namespace VegasTimer
             Reset.Click += ClickReset;
             Controls.Add(Reset);
 
+            Sounds = new CheckBox
+            {
+                Text = "Sounds",
+                Location = Point.Add(Start.Location, new Size(0, 30)),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                Checked = Config.Sounds
+            };
+            Sounds.CheckedChanged += ToggleSounds;
+            Controls.Add(Sounds);
+
             Time = new Label
             {
                 Text = Config.Elapsed.ToString(@"hh\:mm\:ss\:fff"),
@@ -72,29 +84,50 @@ namespace VegasTimer
                 Config.Load();
             Time.Text = Config.Elapsed.ToString(@"hh\:mm\:ss\:fff");
         }
-
-        private void OnClose(object sender, CancelEventArgs e)
-        {
-            if (IsRunning)
-                ClickStart(this, EventArgs.Empty);
-        }
-
-        private void ClickStart(object sender, EventArgs e)
+        public void ToggleTimer(bool sound)
         {
             if (IsRunning)
             {
                 Timer.Stop();
                 Config.Elapsed += DateTime.Now - StartTime;
                 Start.Text = "Start";
+                if (sound)
+                    PlaySound("stop");
             }
             else
             {
                 Timer.Start();
                 StartTime = DateTime.Now;
                 Start.Text = "Pause";
+                if (sound)
+                    PlaySound("start");
             }
             Config.Save();
             IsRunning = !IsRunning;
+        }
+
+        private void PlaySound(string type)
+        {
+            try
+            {
+                SoundPlayer player = new SoundPlayer(Config.Directory + $"\\timer_{type}_sound.wav");
+                player.Play();
+            }
+            catch (Exception)
+            {
+                SystemSounds.Beep.Play();
+            }
+        }
+
+        private void OnClose(object sender, CancelEventArgs e)
+        {
+            if (IsRunning)
+                ToggleTimer(false);
+        }
+
+        private void ClickStart(object sender, EventArgs e)
+        {
+            ToggleTimer(Config.Sounds);
         }
 
         private void ClickReset(object sender, EventArgs e)
@@ -103,6 +136,13 @@ namespace VegasTimer
             Config.Elapsed = TimeSpan.Zero;
             IsRunning = false;
             Time.Text = "00:00:00:000";
+            Config.Save();
+            if (Config.Sounds)
+                PlaySound("reset");
+        }
+        private void ToggleSounds(object sender, EventArgs e)
+        {
+            Config.Sounds = Sounds.Checked;
             Config.Save();
         }
 
@@ -116,14 +156,24 @@ namespace VegasTimer
     public class Config
     {
         public TimeSpan Elapsed { get; set; } = TimeSpan.Zero;
+        public bool Sounds { get; set; } = true;
         [JsonIgnore]
         public bool IsLoaded { get; set; } = false;
         [JsonIgnore]
         public const string Title = "VegasTimer";
         [JsonIgnore]
-        public static string Directory = Environment.CurrentDirectory + "\\VegasTimer";
+        public string Directory;
         [JsonIgnore]
-        public static string Path = Directory + "\\config.json";
+        public string Path;
+
+        public Config(Vegas vegas)
+        {
+            if (vegas == null)
+                return;
+
+            Directory = vegas.GetApplicationDataPath(Environment.SpecialFolder.ApplicationData) + Title;
+            Path = Directory + "\\config.json";
+        }
 
         public void Load()
         {
@@ -136,6 +186,7 @@ namespace VegasTimer
                     string content = File.ReadAllText(Path);
                     Config serealized = JsonConvert.DeserializeObject<Config>(content);
                     Elapsed = serealized.Elapsed;
+                    Sounds = serealized.Sounds;
                     IsLoaded = true;
                 }
                 catch (Exception e)
@@ -166,12 +217,15 @@ namespace VegasTimer
 
         public void Save()
         {
+            if (!IsLoaded)
+                return;
+
             JsonSerializerSettings settings = new JsonSerializerSettings()
             {
-                Formatting = Formatting.Indented
+                Formatting = Formatting.Indented,
+                NullValueHandling = NullValueHandling.Ignore
             };
             JsonSerializer serializer = JsonSerializer.Create(settings);
-            serializer.NullValueHandling = NullValueHandling.Ignore;
 
             try
             {
@@ -191,9 +245,10 @@ namespace VegasTimer
     public class VegasTimer : ICustomCommandModule
     {
         public Vegas Vegas = null;
-        private Config Config = new Config();
+        private Config Config = null;
+        private Chronometer Chronometer = null;
 
-        public ICollection GetCustomCommands()
+        public ICollection GetCustomCommands() // TODO Ouvrir la fenetre si elle n'est pas ouverte quand on toggle
         {
             CustomCommand timer = new CustomCommand(CommandCategory.Tools, "VegasTimer")
             {
@@ -205,27 +260,38 @@ namespace VegasTimer
             {
                 if (!Vegas.ActivateDockView("TimerView"))
                 {
-                    Chronometer chrono = new Chronometer(ref Config)
+                    Chronometer = new Chronometer(ref Config)
                     {
                         AutoLoadCommand = timer
                     };
 
-                    Vegas.LoadDockView(chrono);
+                    Vegas.LoadDockView(Chronometer);
                 }
             };
 
-            return new CustomCommand[] { timer };
+            CustomCommand toggle = new CustomCommand(CommandCategory.Tools, "ToggleTimer")
+            {
+                DisplayName = "Toggle Timer",
+                MenuSelectMessage = "Start/Stop the current timer.",
+                CanAddToKeybindings = true
+            };
+
+            toggle.Invoked += (s, a) =>
+            {
+                Chronometer.ToggleTimer(Config.Sounds);
+            };
+
+            return new CustomCommand[] { timer, toggle };
         }
 
         public void InitializeModule(Vegas vegas)
         {
             Vegas = vegas;
 
-            vegas.AppInitialized += (v, args) => { 
-                if (!Config.IsLoaded)
-                    Config.Load();
+            vegas.AppInitialized += (v, args) => {
+                Config = new Config(vegas);
+                Config.Load();
             };
-
             vegas.AppDeactivate += (v, args) => Config.Save();
         }
     }
