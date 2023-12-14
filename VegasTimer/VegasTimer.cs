@@ -185,6 +185,10 @@ namespace VegasTimer
                 {
                     string content = File.ReadAllText(Path);
                     Config serealized = JsonConvert.DeserializeObject<Config>(content);
+
+                    if (serealized == null)
+                        throw new Exception("Deserialization returned null:\n" + content);
+
                     Elapsed = serealized.Elapsed;
                     Sounds = serealized.Sounds;
                     IsLoaded = true;
