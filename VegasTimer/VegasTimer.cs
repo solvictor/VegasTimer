@@ -38,7 +38,7 @@ namespace VegasTimer
             PersistDockWindowState = true;
             Text = "Timer";
             Config = config;
-            BackColor = Color.FromArgb(34, 34, 34);
+            BackColor = Color.FromArgb(40, 40, 40);
             Loaded += OnLoaded;
             AppWindowClosing += OnClose;
             Closing += OnClose;
