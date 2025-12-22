@@ -7,6 +7,7 @@ using ScriptPortal.Vegas;
 using System.ComponentModel;
 using System.IO;
 using Newtonsoft.Json;
+using System.Net;
 
 namespace VegasTimer
 {
