@@ -19,6 +19,7 @@ namespace VegasTimer
         private readonly Button Start;
         private readonly Button Reset;
         private readonly CheckBox Sounds;
+        private readonly CheckBox PauseOnUnfocus;
         private readonly Timer Timer;
         private readonly Config Config;
         private readonly Vegas MyVegas;
@@ -34,7 +35,7 @@ namespace VegasTimer
             Loaded += OnLoaded;
             AppWindowClosing += OnClose;
             Closing += OnClose;
-            DefaultFloatingSize = new Size(200, 175);
+            DefaultFloatingSize = new Size(200, 210);
 
             MyVegas.AppActivated += OnAppActivate;
             MyVegas.AppDeactivate += OnAppDeactivate;
@@ -68,10 +69,22 @@ namespace VegasTimer
                 Text = "Sounds",
                 Location = Point.Add(Start.Location, new Size(0, 30)),
                 ForeColor = Color.FromArgb(220, 220, 220),
-                Checked = Config.Sounds
+                Checked = Config.Sounds,
+                AutoSize = true
             };
             Sounds.CheckedChanged += ToggleSounds;
             Controls.Add(Sounds);
+
+            PauseOnUnfocus = new CheckBox
+            {
+                Text = "Pause on unfocus",
+                Location = Point.Add(Sounds.Location, new Size(0, 25)),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                Checked = Config.PauseOnUnfocus,
+                AutoSize = true
+            };
+            PauseOnUnfocus.CheckedChanged += TogglePauseOnUnfocus;
+            Controls.Add(PauseOnUnfocus);
 
             Time = new Label
             {
@@ -86,7 +99,7 @@ namespace VegasTimer
 
         private void OnAppDeactivate(object sender, EventArgs e)
         {
-            if (IsRunning)
+            if (IsRunning && Config.PauseOnUnfocus)
             {
                 Timer.Stop();
                 Config.Elapsed += DateTime.Now - StartTime;
@@ -108,7 +121,10 @@ namespace VegasTimer
         {
             if (!Config.IsLoaded)
                 Config.Load();
+
             Time.Text = Config.Elapsed.ToString(@"hh\:mm\:ss\:fff");
+            Sounds.Checked = Config.Sounds;
+            PauseOnUnfocus.Checked = Config.PauseOnUnfocus;
         }
 
         public void ToggleTimer(bool sound)
@@ -116,15 +132,15 @@ namespace VegasTimer
             if (IsRunning)
             {
                 Timer.Stop();
-                if (!IsPausedByFocus) 
+                if (!IsPausedByFocus)
                 {
-                   Config.Elapsed += DateTime.Now - StartTime;
+                    Config.Elapsed += DateTime.Now - StartTime;
                 }
-                
+
                 Start.Text = "Start";
                 if (sound)
                     PlaySound("stop");
-                
+
                 IsPausedByFocus = false;
             }
             else
@@ -178,10 +194,16 @@ namespace VegasTimer
             if (Config.Sounds)
                 PlaySound("reset");
         }
-        
+
         private void ToggleSounds(object sender, EventArgs e)
         {
             Config.Sounds = Sounds.Checked;
+            Config.Save();
+        }
+
+        private void TogglePauseOnUnfocus(object sender, EventArgs e)
+        {
+            Config.PauseOnUnfocus = PauseOnUnfocus.Checked;
             Config.Save();
         }
 
@@ -196,6 +218,8 @@ namespace VegasTimer
     {
         public TimeSpan Elapsed { get; set; } = TimeSpan.Zero;
         public bool Sounds { get; set; } = true;
+        public bool PauseOnUnfocus { get; set; } = true;
+
         [JsonIgnore]
         public bool IsLoaded { get; set; } = false;
         [JsonIgnore]
@@ -217,7 +241,7 @@ namespace VegasTimer
         public void Load()
         {
             FileInfo configFile = new FileInfo(Path);
-            
+
             if (configFile.Exists)
             {
                 try
@@ -230,6 +254,7 @@ namespace VegasTimer
 
                     Elapsed = serealized.Elapsed;
                     Sounds = serealized.Sounds;
+                    PauseOnUnfocus = serealized.PauseOnUnfocus;
                     IsLoaded = true;
                 }
                 catch (Exception e)
@@ -294,7 +319,7 @@ namespace VegasTimer
                 DisplayName = "Timer",
                 MenuSelectMessage = "Open a timer."
             };
-            
+
             timer.Invoked += (s, a) =>
             {
                 if (!Vegas.ActivateDockView("TimerView"))
@@ -317,7 +342,7 @@ namespace VegasTimer
 
             toggle.Invoked += (s, a) =>
             {
-                if (Chronometer != null) 
+                if (Chronometer != null)
                 {
                     Chronometer.ToggleTimer(Config.Sounds);
                 }
