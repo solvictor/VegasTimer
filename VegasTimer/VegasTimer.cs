@@ -27,6 +27,12 @@ namespace VegasTimer
 
         public Chronometer(Vegas vegas, ref Config config) : base("Timer")
         {
+            this.SetStyle(ControlStyles.DoubleBuffer | 
+                          ControlStyles.UserPaint | 
+                          ControlStyles.AllPaintingInWmPaint | 
+                          ControlStyles.ResizeRedraw, true);
+            this.UpdateStyles();
+
             MyVegas = vegas;
             DefaultDockWindowStyle = DockWindowStyle.Floating;
             PersistDockWindowState = true;
@@ -96,6 +102,15 @@ namespace VegasTimer
                 ForeColor = Color.FromArgb(220, 220, 220)
             };
             Controls.Add(Time);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            using (SolidBrush brush = new SolidBrush(this.BackColor))
+            {
+                e.Graphics.FillRectangle(brush, this.ClientRectangle);
+            }
+            base.OnPaint(e);
         }
 
         private void OnAppDeactivate(object sender, EventArgs e)
